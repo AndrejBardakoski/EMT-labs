@@ -17,5 +17,6 @@ public interface BookService {
     Optional<Book> edit(Long id,BookDTO bookDTO);
     void deleteById (Long id);
     Optional<Book> rent(Long id);
+    void refreshMaterializedView();
 
 }

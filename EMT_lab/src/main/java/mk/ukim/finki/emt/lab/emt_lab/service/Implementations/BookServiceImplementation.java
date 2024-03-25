@@ -4,26 +4,35 @@ import mk.ukim.finki.emt.lab.emt_lab.model.Author;
 import mk.ukim.finki.emt.lab.emt_lab.model.Book;
 import mk.ukim.finki.emt.lab.emt_lab.model.DTO.BookDTO;
 import mk.ukim.finki.emt.lab.emt_lab.model.enums.CategoryEnum;
+import mk.ukim.finki.emt.lab.emt_lab.model.events.BookCreatedEvent;
 import mk.ukim.finki.emt.lab.emt_lab.model.exeptions.AuthorNotFoundException;
 import mk.ukim.finki.emt.lab.emt_lab.model.exeptions.BookNotFoundExceptuin;
 import mk.ukim.finki.emt.lab.emt_lab.model.exeptions.NoAvailableBookCopiesExeption;
+import mk.ukim.finki.emt.lab.emt_lab.model.views.BookMatView;
 import mk.ukim.finki.emt.lab.emt_lab.repository.AuthorRepository;
 import mk.ukim.finki.emt.lab.emt_lab.repository.BookRepository;
+import mk.ukim.finki.emt.lab.emt_lab.repository.views.BookMatViewRepository;
 import mk.ukim.finki.emt.lab.emt_lab.service.BookService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class BookServiceImplementation implements BookService {
 
     private final BookRepository bookRepository;
     private final AuthorRepository authorRepository;
+    private final BookMatViewRepository bookMatViewRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
-    public BookServiceImplementation(BookRepository bookRepository, AuthorRepository authorRepository) {
+    public BookServiceImplementation(BookRepository bookRepository, AuthorRepository authorRepository, BookMatViewRepository bookMatViewRepository, ApplicationEventPublisher applicationEventPublisher) {
         this.bookRepository = bookRepository;
         this.authorRepository = authorRepository;
+        this.bookMatViewRepository = bookMatViewRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
 
@@ -43,6 +52,9 @@ public class BookServiceImplementation implements BookService {
 
         Book book = new Book(name, category, author, availableCopies);
         bookRepository.save(book);
+
+        this.applicationEventPublisher.publishEvent(new BookCreatedEvent(book));
+
         return Optional.of(book);
     }
 
@@ -88,5 +100,14 @@ public class BookServiceImplementation implements BookService {
         book.setAvalibleCopies(availableCopies);
         bookRepository.save(book);
         return Optional.of(book);
+    }
+
+    @Override
+    public void refreshMaterializedView() {
+        List<Book> books = bookRepository.findAll();
+        List<BookMatView> bookMatViews = books.stream().map(book -> new BookMatView(book.getId(), book.getCategory(), book.getName())).collect(Collectors.toList());
+
+        bookMatViewRepository.deleteAll();
+        bookMatViewRepository.saveAll(bookMatViews);
     }
 }
